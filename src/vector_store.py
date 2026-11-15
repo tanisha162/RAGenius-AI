@@ -32,6 +32,15 @@ class HybridRetriever:
         self.bm25 = BM25Okapi(tokenized_documents)
 
 
+    def invoke(self, query, config=None, **kwargs):
+        """Retrieve documents for a query.
+
+        app.py calls this method when the user asks a question, so it
+        must exist (previously only ``search`` existed and every
+        question crashed with AttributeError).
+        """
+        return self.search(query)
+
     def search(self, query, k=5):
 
         # Semantic search using FAISS
