@@ -75,17 +75,30 @@ with st.sidebar:
 
                     progress_bar.progress(progress)
 
-                # Create Hybrid Retriever / Vector Store
-                st.session_state.vector_store = create_vector_store(
-                    all_documents
-                )
+                if not all_documents:
+                    # Scanned / image-only PDFs yield no text chunks;
+                    # creating a vector store from zero documents
+                    # crashes, so warn and keep any previous
+                    # knowledge base instead.
+                    st.warning(
+                        "⚠️ No text could be extracted from the uploaded "
+                        "PDF(s) — they may be scanned images. Please "
+                        "upload a PDF with selectable text."
+                    )
 
-                st.session_state.document_count = len(uploaded_files)
-                st.session_state.chunk_count = len(all_documents)
+                else:
+                    # Create Hybrid Retriever / Vector Store
+                    st.session_state.vector_store = create_vector_store(
+                        all_documents
+                    )
+
+                    st.session_state.document_count = len(uploaded_files)
+                    st.session_state.chunk_count = len(all_documents)
 
             progress_bar.empty()
 
-            st.success("Knowledge base created successfully! 🎉")
+            if all_documents:
+                st.success("Knowledge base created successfully! 🎉")
 
     st.divider()
 

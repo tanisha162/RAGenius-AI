@@ -8,6 +8,12 @@ every question crashed with:
 Runs with the standard library only (``python3 -m unittest
 tests.test_hybrid_retriever``); the heavy langchain/faiss/sentence-
 transformers dependencies are stubbed out.
+
+Also covers the empty-corpus guard: a PDF with no extractable text
+(e.g. scanned / image-only) yields zero chunks, and building a
+retriever from zero documents crashed with a cryptic IndexError
+(from FAISS) / ZeroDivisionError (from BM25) instead of failing
+clearly.
 """
 
 import sys
@@ -64,6 +70,16 @@ class TestHybridRetrieverInvoke(unittest.TestCase):
             self.retriever.invoke("capital of France"),
             self.retriever.search("capital of France"),
         )
+
+
+class TestCreateVectorStoreEmpty(unittest.TestCase):
+    def test_empty_documents_raise_value_error(self):
+        # Regression test: a text-less PDF produces zero chunks, and
+        # create_vector_store([]) used to crash with a cryptic
+        # IndexError (FAISS) / ZeroDivisionError (BM25). It must fail
+        # with a clear ValueError so app.py can warn the user instead.
+        with self.assertRaises(ValueError):
+            create_vector_store([])
 
 
 if __name__ == "__main__":

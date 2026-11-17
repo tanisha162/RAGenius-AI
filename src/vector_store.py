@@ -13,6 +13,16 @@ class HybridRetriever:
 
     def __init__(self, documents):
 
+        if not documents:
+            # A PDF with no extractable text (e.g. a scanned/image-only
+            # PDF) yields zero chunks; FAISS and BM25 both crash on an
+            # empty corpus (IndexError / ZeroDivisionError), so fail
+            # here with a clear message instead.
+            raise ValueError(
+                "Cannot build a retriever from zero documents: "
+                "no text could be extracted from the uploaded PDF(s)."
+            )
+
         self.documents = documents
 
         # FAISS semantic search
