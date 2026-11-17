@@ -61,7 +61,19 @@ with st.sidebar:
 
                 for index, uploaded_file in enumerate(uploaded_files):
 
-                    documents = process_pdf(uploaded_file)
+                    try:
+                        documents = process_pdf(uploaded_file)
+                    except Exception:
+                        # A corrupt / unreadable PDF must not kill the
+                        # whole app (or discard the other files in this
+                        # batch): warn, skip it, and keep any previous
+                        # knowledge base.
+                        st.warning(
+                            f"⚠️ Could not read '{uploaded_file.name}' — "
+                            "it may be corrupted or not a valid PDF. "
+                            "Skipping it."
+                        )
+                        continue
 
                     # Add source metadata
                     for doc in documents:
