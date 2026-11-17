@@ -55,6 +55,8 @@ with st.sidebar:
 
             all_documents = []
 
+            processed_count = 0
+
             progress_bar = st.progress(0)
 
             with st.spinner("Processing documents..."):
@@ -78,6 +80,8 @@ with st.sidebar:
                     # Add source metadata
                     for doc in documents:
                         doc.metadata["source"] = uploaded_file.name
+
+                    processed_count += 1
 
                     all_documents.extend(documents)
 
@@ -104,7 +108,7 @@ with st.sidebar:
                         all_documents
                     )
 
-                    st.session_state.document_count = len(uploaded_files)
+                    st.session_state.document_count = processed_count
                     st.session_state.chunk_count = len(all_documents)
 
             progress_bar.empty()
