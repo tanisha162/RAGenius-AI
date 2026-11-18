@@ -81,7 +81,12 @@ with st.sidebar:
                     for doc in documents:
                         doc.metadata["source"] = uploaded_file.name
 
-                    processed_count += 1
+                    if documents:
+                        # Only a file that actually yielded text counts
+                        # towards the Documents stat: a scanned /
+                        # image-only PDF loads fine but contributes
+                        # zero chunks, so it must not be counted.
+                        processed_count += 1
 
                     all_documents.extend(documents)
 

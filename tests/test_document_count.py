@@ -8,6 +8,11 @@ into the knowledge base (the corrupt one was warned about and
 skipped). ``document_count`` must be the number of files that were
 successfully processed.
 
+The same overcount also applied to scanned / image-only PDFs: they
+load fine but yield zero chunks, so they contributed nothing to the
+knowledge base yet were counted as a document. Only files that
+actually contributed chunks may be counted.
+
 Runs with the standard library only (``python3 -m unittest discover
 -s tests``); the heavy dependencies are stubbed out, same as
 ``test_corrupt_pdf_upload.py``. Because ``unittest discover`` imports
@@ -68,6 +73,10 @@ class SelectiveLoader:
     def load(self):
         if self._data == b"this is not a pdf at all":
             raise FakePdfError("Stream has ended unexpectedly")
+        if self._data == b"%PDF-1.4 scanned image only":
+            # A scanned / image-only PDF: loads fine, but no text can
+            # be extracted, so process_pdf returns zero chunks.
+            return []
         return [FakeDoc("Some real extracted text about Paris.")]
 
 
@@ -76,6 +85,7 @@ def _install_stubs():
     st.session_state = FakeSessionState()
     st.file_uploader.return_value = [
         FakeUpload("good.pdf", b"%PDF-1.4 good content"),
+        FakeUpload("scanned.pdf", b"%PDF-1.4 scanned image only"),
         FakeUpload("broken.pdf", b"this is not a pdf at all"),
     ]
     # Only the "Process Documents" button is pressed.
@@ -142,6 +152,15 @@ class TestDocumentCount(unittest.TestCase):
         # Regression test: document_count used to be
         # len(uploaded_files) == 2 even though broken.pdf was skipped.
         self.assertEqual(_ST.session_state.get("document_count"), 1)
+
+    def test_scanned_pdf_not_counted(self):
+        # Regression test: a scanned / image-only PDF loads fine but
+        # yields zero chunks, and document_count used to count it
+        # anyway (2 for a good + scanned + broken batch), even though
+        # only the good file was indexed. Only files that actually
+        # contributed chunks may be counted.
+        self.assertEqual(_ST.session_state.get("document_count"), 1)
+        self.assertEqual(_ST.session_state.get("chunk_count"), 1)
 
     def test_chunk_count_matches_indexed_documents(self):
         self.assertEqual(_ST.session_state.get("chunk_count"), 1)
