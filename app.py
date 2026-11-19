@@ -224,16 +224,31 @@ if question:
 
             with st.spinner("🤖 RAGenius AI is thinking..."):
 
-                # IMPORTANT:
-                # HybridRetriever uses invoke(), NOT similarity_search()
-                documents = st.session_state.vector_store.invoke(
-                    question
-                )
+                try:
+                    # IMPORTANT:
+                    # HybridRetriever uses invoke(), NOT similarity_search()
+                    documents = st.session_state.vector_store.invoke(
+                        question
+                    )
 
-                answer = generate_answer(
-                    question,
-                    documents
-                )
+                    answer = generate_answer(
+                        question,
+                        documents
+                    )
+                except Exception:
+                    # The answer step can fail — missing/invalid API
+                    # key, quota, or a network error — and that must
+                    # not kill the whole app with a traceback (same as
+                    # a corrupt PDF upload): tell the user, hide the
+                    # sources, and keep the chat going.
+                    documents = []
+
+                    answer = (
+                        "⚠️ I couldn't get an answer right now — the "
+                        "language model is unavailable. Please check "
+                        "your GOOGLE_API_KEY, quota, or connection "
+                        "and try asking again."
+                    )
 
             # Display Answer
             st.markdown(answer)
