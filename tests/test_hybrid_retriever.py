@@ -82,5 +82,70 @@ class TestCreateVectorStoreEmpty(unittest.TestCase):
             create_vector_store([])
 
 
+class TestHybridSearchIncludesKeywordHits(unittest.TestCase):
+    """Regression test: the BM25 (keyword) leg must actually reach
+    the answer.
+
+    search() used to put every semantic hit first and then truncate
+    to k, so whenever the corpus had >= k documents the keyword
+    results were always cut off and BM25 never affected the answer
+    at all — a document that was the top BM25 match for an exact
+    keyword query was silently dropped.
+    """
+
+    def _retriever_with_fixed_bm25(self, docs, scores):
+        """Build a retriever whose BM25 leg returns fixed scores.
+
+        The retriever's ``bm25`` attribute is replaced on the
+        instance (not the module global): sibling test modules evict
+        and re-import ``src.*`` under their own stubs, so patching
+        the module global can land on a different module object
+        than the one ``create_vector_store`` was imported from.
+        """
+
+        class FixedBM25:
+            def __init__(self, tokenized):
+                pass
+
+            def get_scores(self, query_tokens):
+                return scores
+
+        retriever = create_vector_store(docs)
+        retriever.bm25 = FixedBM25([])
+        return retriever
+
+    def test_bm25_top_hit_is_returned(self):
+        docs = [
+            FakeDoc(f"Document number {i} about topic {i}.")
+            for i in range(6)
+        ]
+        docs[5] = FakeDoc("Zebraxylophone is the secret keyword.")
+        # Only doc 5 matches the query keyword.
+        retriever = self._retriever_with_fixed_bm25(
+            docs, [0, 0, 0, 0, 0, 10]
+        )
+        # Semantic search returns docs 0..4 only.
+        retriever.vector_store.similarity_search.return_value = docs[:5]
+
+        result = retriever.search("zebraxylophone", k=5)
+
+        self.assertEqual(len(result), 5)
+        self.assertIn(docs[5], result)
+
+    def test_duplicate_hits_still_appear_once(self):
+        # A document returned by both legs must not be duplicated.
+        docs = [
+            FakeDoc("The capital of France is Paris."),
+            FakeDoc("Photosynthesis happens in chloroplasts."),
+        ]
+        retriever = self._retriever_with_fixed_bm25(docs, [5, 1])
+        retriever.vector_store.similarity_search.return_value = docs
+
+        result = retriever.search("capital of France", k=2)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(len({d.page_content for d in result}), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -78,18 +78,32 @@ class HybridRetriever:
             for i in top_indexes
         ]
 
-        # Combine results and remove duplicates
+        # Combine results and remove duplicates, interleaving the
+        # semantic and keyword lists so both legs of the hybrid
+        # search can contribute. (Previously the semantic list was
+        # placed first and the result truncated to k, so whenever
+        # the corpus had >= k documents the keyword results were
+        # always cut off and BM25 never affected the answer.)
         combined_docs = []
         seen_content = set()
 
-        for doc in semantic_docs + keyword_docs:
+        for semantic_doc, keyword_doc in zip(
+            semantic_docs, keyword_docs
+        ):
+            for doc in (semantic_doc, keyword_doc):
+                content_key = doc.page_content
 
+                if content_key not in seen_content:
+                    combined_docs.append(doc)
+                    seen_content.add(content_key)
+
+        # Either list may be longer than the other; append the tail.
+        for doc in semantic_docs[len(keyword_docs):] + \
+                keyword_docs[len(semantic_docs):]:
             content_key = doc.page_content
 
             if content_key not in seen_content:
-
                 combined_docs.append(doc)
-
                 seen_content.add(content_key)
 
         # Return top results
