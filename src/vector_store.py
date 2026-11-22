@@ -1,6 +1,20 @@
+import re
+
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from rank_bm25 import BM25Okapi
+
+
+def _tokenize(text):
+    """Split text into lowercase word tokens, stripping punctuation.
+
+    Plain ``str.split()`` keeps sentence punctuation attached to words,
+    so "zebraxylophone." never matched the query word "zebraxylophone"
+    (and a query ending in "?" never matched the bare word in a
+    document) — the BM25 leg silently missed exact keyword hits
+    whenever the keyword ended a sentence or carried punctuation.
+    """
+    return re.findall(r"\w+", text.lower())
 
 
 def get_embeddings():
@@ -35,7 +49,7 @@ class HybridRetriever:
 
         # BM25 keyword search
         tokenized_documents = [
-            doc.page_content.lower().split()
+            _tokenize(doc.page_content)
             for doc in documents
         ]
 
@@ -60,7 +74,7 @@ class HybridRetriever:
         )
 
         # Keyword search using BM25
-        tokenized_query = query.lower().split()
+        tokenized_query = _tokenize(query)
 
         bm25_scores = self.bm25.get_scores(
             tokenized_query
