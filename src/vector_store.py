@@ -80,12 +80,21 @@ class HybridRetriever:
             tokenized_query
         )
 
-        # Get best BM25 document indexes
-        top_indexes = sorted(
-            range(len(bm25_scores)),
-            key=lambda i: bm25_scores[i],
-            reverse=True
-        )[:k]
+        # Get best BM25 document indexes — but only documents that
+        # actually matched a query keyword (score > 0). When no query
+        # token appears in any document BM25 scores every document
+        # 0, and taking the top-k anyway returned the first k
+        # documents in corpus order: arbitrary, irrelevant documents
+        # that were interleaved into the results and displaced real
+        # semantic hits.
+        top_indexes = [
+            i for i in sorted(
+                range(len(bm25_scores)),
+                key=lambda i: bm25_scores[i],
+                reverse=True
+            )
+            if bm25_scores[i] > 0
+        ][:k]
 
         keyword_docs = [
             self.documents[i]
