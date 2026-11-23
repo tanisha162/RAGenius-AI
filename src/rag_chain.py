@@ -54,7 +54,15 @@ Answer:
         text_parts = []
 
         for item in response.content:
-            if isinstance(item, dict) and item.get("type") == "text":
+            if isinstance(item, str):
+                # langchain-core types AIMessage.content as
+                # ``str | list[str | dict]`` — a list may hold plain
+                # strings as well as {"type": "text"} blocks. The old
+                # code only kept dict items, so a list-of-strings
+                # response was silently dropped and the user got a
+                # blank answer.
+                text_parts.append(item)
+            elif isinstance(item, dict) and item.get("type") == "text":
                 text_parts.append(item.get("text", ""))
 
         return "\n".join(text_parts)
