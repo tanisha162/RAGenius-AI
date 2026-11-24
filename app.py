@@ -96,6 +96,8 @@ with st.sidebar:
 
                     progress_bar.progress(progress)
 
+                kb_built = False
+
                 if not all_documents:
                     # Scanned / image-only PDFs yield no text chunks;
                     # creating a vector store from zero documents
@@ -109,16 +111,35 @@ with st.sidebar:
 
                 else:
                     # Create Hybrid Retriever / Vector Store
-                    st.session_state.vector_store = create_vector_store(
-                        all_documents
-                    )
+                    try:
+                        vector_store = create_vector_store(
+                            all_documents
+                        )
+                    except Exception:
+                        # Building the knowledge base can fail — the
+                        # embedding model is downloaded on first use
+                        # (so it needs network), and FAISS can error
+                        # on bad input — and that must not kill the
+                        # whole app (same as a corrupt PDF upload or
+                        # a failed LLM call): warn, and keep any
+                        # previous knowledge base instead.
+                        st.warning(
+                            "⚠️ Could not build the knowledge base — "
+                            "the embedding model may be unavailable. "
+                            "Please check your connection and try "
+                            "again."
+                        )
+                        vector_store = None
 
-                    st.session_state.document_count = processed_count
-                    st.session_state.chunk_count = len(all_documents)
+                    if vector_store is not None:
+                        st.session_state.vector_store = vector_store
+                        st.session_state.document_count = processed_count
+                        st.session_state.chunk_count = len(all_documents)
+                        kb_built = True
 
             progress_bar.empty()
 
-            if all_documents:
+            if kb_built:
                 st.success("Knowledge base created successfully! 🎉")
 
     st.divider()
