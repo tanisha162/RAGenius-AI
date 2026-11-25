@@ -146,6 +146,32 @@ class TestHybridSearchIncludesKeywordHits(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(len({d.page_content for d in result}), 2)
 
+    def test_identical_text_on_different_pages_both_returned(self):
+        # Regression test: chunks with identical text on different
+        # pages are distinct results, not duplicates. search() used
+        # to dedupe the combined results on page_content alone, so
+        # when the same clause appeared on two pages (repeated
+        # boilerplate, terms, disclaimers) the second chunk was
+        # silently dropped — that page never appeared in the results
+        # or in the "View Sources" list. Only the same chunk
+        # returned by both legs is a duplicate.
+        docs = [
+            FakeDoc("The refund policy allows returns within 30 days."),
+            FakeDoc("The refund policy allows returns within 30 days."),
+            FakeDoc("Shipping is free over fifty dollars."),
+        ]
+        docs[0].metadata = {"source": "policy.pdf", "page": 0}
+        docs[1].metadata = {"source": "policy.pdf", "page": 4}
+        docs[2].metadata = {"source": "policy.pdf", "page": 1}
+        retriever = self._retriever_with_fixed_bm25(docs, [1, 1, 0])
+        retriever.vector_store.similarity_search.return_value = docs
+
+        result = retriever.search("refund policy", k=3)
+
+        self.assertEqual(len(result), 3)
+        self.assertIn(docs[0], result)
+        self.assertIn(docs[1], result)
+
 
 if __name__ == "__main__":
     unittest.main()
