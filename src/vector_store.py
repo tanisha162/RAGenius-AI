@@ -53,7 +53,20 @@ class HybridRetriever:
             for doc in documents
         ]
 
-        self.bm25 = BM25Okapi(tokenized_documents)
+        if not any(tokenized_documents):
+            # A corpus with no searchable words at all — every chunk
+            # is only punctuation / symbols (e.g. a page of dashes,
+            # dots or bullet separators), so every token list is
+            # empty. BM25Okapi cannot be built from that: its
+            # _calc_idf divides by len(self.idf) over an empty idf
+            # dict, raising ZeroDivisionError out of __init__ and
+            # failing the whole knowledge-base build. But a corpus
+            # with no tokens has no keyword leg to run anyway — every
+            # BM25 score would be 0 — so skip BM25 and answer from
+            # the semantic leg alone instead of crashing.
+            self.bm25 = None
+        else:
+            self.bm25 = BM25Okapi(tokenized_documents)
 
 
     def invoke(self, query, config=None, **kwargs):
@@ -73,33 +86,38 @@ class HybridRetriever:
             k=k
         )
 
-        # Keyword search using BM25
-        tokenized_query = _tokenize(query)
+        # Keyword search using BM25 — skipped when the corpus has no
+        # searchable words (self.bm25 is None): there is no keyword
+        # leg to run, so the semantic hits stand on their own.
+        if self.bm25 is None:
+            keyword_docs = []
+        else:
+            tokenized_query = _tokenize(query)
 
-        bm25_scores = self.bm25.get_scores(
-            tokenized_query
-        )
-
-        # Get best BM25 document indexes — but only documents that
-        # actually matched a query keyword (score > 0). When no query
-        # token appears in any document BM25 scores every document
-        # 0, and taking the top-k anyway returned the first k
-        # documents in corpus order: arbitrary, irrelevant documents
-        # that were interleaved into the results and displaced real
-        # semantic hits.
-        top_indexes = [
-            i for i in sorted(
-                range(len(bm25_scores)),
-                key=lambda i: bm25_scores[i],
-                reverse=True
+            bm25_scores = self.bm25.get_scores(
+                tokenized_query
             )
-            if bm25_scores[i] > 0
-        ][:k]
 
-        keyword_docs = [
-            self.documents[i]
-            for i in top_indexes
-        ]
+            # Get best BM25 document indexes — but only documents that
+            # actually matched a query keyword (score > 0). When no query
+            # token appears in any document BM25 scores every document
+            # 0, and taking the top-k anyway returned the first k
+            # documents in corpus order: arbitrary, irrelevant documents
+            # that were interleaved into the results and displaced real
+            # semantic hits.
+            top_indexes = [
+                i for i in sorted(
+                    range(len(bm25_scores)),
+                    key=lambda i: bm25_scores[i],
+                    reverse=True
+                )
+                if bm25_scores[i] > 0
+            ][:k]
+
+            keyword_docs = [
+                self.documents[i]
+                for i in top_indexes
+            ]
 
         # Combine results and remove duplicates, interleaving the
         # semantic and keyword lists so both legs of the hybrid
