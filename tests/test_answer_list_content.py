@@ -133,6 +133,41 @@ class TestAnswerListContent(unittest.TestCase):
 
         self.assertEqual("Paris is the capital.", answer)
 
+    def test_text_block_with_none_text_does_not_crash(self):
+        # Regression test: a text block whose "text" is None (a
+        # malformed / partial model response) crashed
+        # ``generate_answer`` — ``item.get("text", "")`` returned
+        # None, and "\n".join() raised TypeError, so the whole
+        # answer step failed and the user was told the model was
+        # unavailable even though it had responded. A None text
+        # carries no answer, so it is skipped like a thinking-only
+        # block and the user gets the plain empty-response message.
+        rag_chain = _load_rag_chain(FakeResponse([
+            {"type": "text", "text": None},
+        ]))
+
+        answer = rag_chain.generate_answer(
+            "What is the capital of France?",
+            [FakeDoc("Paris is the capital of France.")],
+        )
+
+        self.assertIn("couldn't get an answer", answer)
+
+    def test_none_text_block_does_not_drop_real_text(self):
+        # A malformed block must not take a good block down with
+        # it: the real answer text still reaches the user.
+        rag_chain = _load_rag_chain(FakeResponse([
+            {"type": "text", "text": None},
+            {"type": "text", "text": "Paris is the capital."},
+        ]))
+
+        answer = rag_chain.generate_answer(
+            "What is the capital of France?",
+            [FakeDoc("Paris is the capital of France.")],
+        )
+
+        self.assertEqual("Paris is the capital.", answer)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -63,7 +63,15 @@ Answer:
                 # blank answer.
                 text_parts.append(item)
             elif isinstance(item, dict) and item.get("type") == "text":
-                text_parts.append(item.get("text", ""))
+                # A text block's "text" can be None (or a non-string)
+                # in a malformed / partial model response; appending
+                # it as-is crashed "\n".join() with a TypeError, so
+                # the whole answer step failed and the user was told
+                # the model was unavailable even though it had
+                # responded. Only real strings carry answer text.
+                block_text = item.get("text", "")
+                if isinstance(block_text, str):
+                    text_parts.append(block_text)
 
         text = "\n".join(text_parts)
     elif response.content is None:
