@@ -65,6 +65,24 @@ Answer:
             elif isinstance(item, dict) and item.get("type") == "text":
                 text_parts.append(item.get("text", ""))
 
-        return "\n".join(text_parts)
+        text = "\n".join(text_parts)
+    elif response.content is None:
+        # No content at all: str(None) would show the user the
+        # literal word "None" as the answer.
+        text = ""
+    else:
+        text = str(response.content)
 
-    return str(response.content)
+    if not text.strip():
+        # The model answered with no usable text — an empty content
+        # list, a list with no text blocks (e.g. only thinking
+        # blocks from a reasoning model, or a response blocked
+        # before any text was produced), or an empty string. The
+        # old code returned "" (a blank answer, shown with sources
+        # and no explanation) or "None". Say so plainly instead.
+        return (
+            "I couldn't get an answer right now — the model returned "
+            "an empty response. Please try asking again."
+        )
+
+    return text
