@@ -8,10 +8,18 @@ load_dotenv()
 
 
 def get_llm():
+    # NOTE: do NOT pass temperature / top_p / top_k here. For
+    # gemini-3.6-flash (and all later Gemini models) Google
+    # deprecated those sampling parameters: the API silently
+    # ignores them, so temperature=0.2 used to look like it made
+    # answers more deterministic while the model actually ran at
+    # its default temperature — and Google says supplying them
+    # will return an HTTP 400 in future model generations. The
+    # prompt in generate_answer ("using ONLY the provided
+    # context") is what keeps answers grounded instead.
     return ChatGoogleGenerativeAI(
         model="gemini-3.6-flash",
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
-        temperature=0.2
+        google_api_key=os.getenv("GOOGLE_API_KEY")
     )
 
 
